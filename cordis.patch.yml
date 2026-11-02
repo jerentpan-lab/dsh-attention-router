@@ -1,0 +1,5 @@
+# dsh-attention-router bundle patch: mounts the plugin into a dsh profile.
+# Install: dsh plugin --profile <name> add dsh-attention-router
+- insert:
+    - id: dsh-attention-router
+      name: dsh-attention-router

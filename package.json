@@ -1,0 +1,37 @@
+{
+  "name": "dsh-attention-router",
+  "version": "0.1.1",
+  "description": "Attention router for DeepSeek Harness: classify events into inform / decide / alert so agents stop over-notifying.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "notifications",
+    "attention",
+    "alerting"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jerentpan-lab/dsh-attention-router.git"
+  }
+}
