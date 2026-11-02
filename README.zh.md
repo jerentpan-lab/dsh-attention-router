@@ -1,5 +1,10 @@
 # dsh-attention-router（注意力路由）
 
+[![npm version](https://img.shields.io/npm/v/dsh-attention-router)](https://www.npmjs.com/package/dsh-attention-router) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+> 作者：jetpan（npm）↔ jerentpan-lab（GitHub）｜[npm 包](https://www.npmjs.com/package/dsh-attention-router)｜[GitHub 仓库](https://github.com/jerentpan-lab/dsh-attention-router)｜也可从 GitHub 安装：`dsh plugin --profile web add github:jerentpan-lab/dsh-attention-router`
+
+
 让 Agent 不再「每件小事都发通知」。把事件分三档并路由：
 
 | 档位 | 含义 | 动作 |

@@ -1,5 +1,10 @@
 # dsh-attention-router
 
+[![npm version](https://img.shields.io/npm/v/dsh-attention-router)](https://www.npmjs.com/package/dsh-attention-router) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+> Author: jetpan (npm) ↔ jerentpan-lab (GitHub) | [npm package](https://www.npmjs.com/package/dsh-attention-router) | [GitHub repo](https://github.com/jerentpan-lab/dsh-attention-router) | install from GitHub: `dsh plugin --profile web add github:jerentpan-lab/dsh-attention-router`
+
+
 Stop agents from over-notifying. Classify every event into one of three tiers and route it:
 
 | tier | meaning | action |

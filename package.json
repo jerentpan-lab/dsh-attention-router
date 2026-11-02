@@ -1,6 +1,6 @@
 {
   "name": "dsh-attention-router",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Attention router for DeepSeek Harness: classify events into inform / decide / alert so agents stop over-notifying.",
   "type": "module",
   "main": "src/index.js",
@@ -32,6 +32,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jerentpan-lab/dsh-attention-router.git"
+    "url": "git+https://github.com/jerentpan-lab/dsh-attention-router.git"
+  },
+  "author": {
+    "name": "jetpan (jerentpan-lab)",
+    "email": "jerentpan@gmail.com",
+    "url": "https://github.com/jerentpan-lab"
+  },
+  "homepage": "https://github.com/jerentpan-lab/dsh-attention-router#readme",
+  "bugs": {
+    "url": "https://github.com/jerentpan-lab/dsh-attention-router/issues"
   }
 }
