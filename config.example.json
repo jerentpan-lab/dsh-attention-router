@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "alert": ["lookup failure", "磁盘写满"],
+    "decide": ["approve this", "下线旧集群"],
+    "inform": ["weekly report"]
+  },
+  "rulesFile": null,
+  "rulesFileWatch": false,
+  "policy": { "notifyInform": false },
+  "fallbackTier": "decide",
+  "dedupe": { "cooldownMs": 60000, "stateFile": null, "maxEntries": 1000 }
+}

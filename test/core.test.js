@@ -91,7 +91,7 @@ test('deduper suppresses repeated keys within cooldown and counts', () => {
   const d = new Deduper({ cooldownMs: 100, now: () => t });
   assert.equal(d.check('k').suppressed, false);
   assert.equal(d.check('k').suppressed, true);
-  assert.equal(d.check('k').count, 1);
+  assert.equal(d.check('k').count, 2); // 0.2.0: suppression count accumulates
   t += 200;
   assert.equal(d.check('k').suppressed, false);
 });

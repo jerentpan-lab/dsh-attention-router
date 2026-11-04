@@ -10,6 +10,9 @@
  *   of being silently dropped as `inform`.
  * - Tiers: alert (report now) / decide (human decision) / inform (log only).
  */
+import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+
 export const TIERS = ['alert', 'decide', 'inform'];
 
 export const DEFAULT_RULES = Object.freeze({
@@ -149,22 +152,67 @@ export function route(tier, policy = {}) {
   return { action: 'log_only', notify: false };
 }
 
-/** In-memory cooldown for repeated alerts; suppression is counted, never dropped. */
+/** Cooldown for repeated alerts; suppression is counted, never dropped.
+ *  0.2.0 A2: optional on-disk persistence (stateFile) so cooldown survives restarts. */
 export class Deduper {
-  constructor({ cooldownMs = 60_000, now = () => Date.now() } = {}) {
+  constructor({ cooldownMs = 60_000, now = () => Date.now(), stateFile = null, maxEntries = 1000 } = {}) {
     this.cooldownMs = cooldownMs;
     this.now = now;
-    this.seen = new Map();
+    this.stateFile = stateFile;
+    this.maxEntries = maxEntries;
+    this.entries = new Map();
+    this.warnings = [];
+    this.load();
+  }
+
+  load() {
+    if (!this.stateFile) return;
+    try {
+      const raw = JSON.parse(readFileSync(this.stateFile, 'utf8'));
+      const entries = raw && typeof raw === 'object' ? raw.entries : null;
+      if (entries && typeof entries === 'object') {
+        for (const [key, v] of Object.entries(entries)) {
+          if (v && typeof v.last === 'number' && Number.isFinite(v.last)) {
+            this.entries.set(key, { last: v.last, count: Number.isInteger(v.count) ? v.count : 0 });
+          }
+        }
+      }
+    } catch (err) {
+      if (err && err.code !== 'ENOENT') this.warnings.push(`dedupe state unreadable: ${err.message}`);
+    }
+  }
+
+  prune() {
+    if (!Number.isInteger(this.maxEntries) || this.maxEntries < 1) return;
+    if (this.entries.size <= this.maxEntries) return;
+    const kept = [...this.entries.entries()].sort((a, b) => b[1].last - a[1].last).slice(0, this.maxEntries);
+    this.entries = new Map(kept);
+  }
+
+  save() {
+    if (!this.stateFile) return;
+    try {
+      mkdirSync(dirname(this.stateFile), { recursive: true });
+      const tmp = `${this.stateFile}.tmp-${process.pid}`;
+      const entries = Object.fromEntries(this.entries);
+      writeFileSync(tmp, JSON.stringify({ v: 1, savedAt: new Date().toISOString(), entries }), 'utf8');
+      renameSync(tmp, this.stateFile);
+    } catch (err) {
+      this.warnings.push(`dedupe state not persisted: ${err.message}`);
+    }
   }
 
   check(key) {
     const t = this.now();
-    const last = this.seen.get(key);
-    if (last !== undefined && t - last < this.cooldownMs) {
-      return { suppressed: true, count: (this.seen.get(`${key}:count`) || 0) + 1 };
+    const entry = this.entries.get(key);
+    if (entry !== undefined && t - entry.last < this.cooldownMs) {
+      entry.count += 1;
+      this.save();
+      return { suppressed: true, count: entry.count };
     }
-    this.seen.set(key, t);
-    this.seen.set(`${key}:count`, 0);
+    this.entries.set(key, { last: t, count: 0 });
+    this.prune();
+    this.save();
     return { suppressed: false, count: 0 };
   }
 }

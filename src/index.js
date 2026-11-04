@@ -2,7 +2,9 @@
  * dsh-attention-router — classify events into inform / decide / alert.
  * Audit-hardened 2026-11-02 (three-party review).
  */
+import { watchFile, unwatchFile } from 'node:fs';
 import { DEFAULT_RULES, Deduper, classify, mergeRules, route } from './core.js';
+import { ConfigError, loadRulesFile, validateConfig } from './config.js';
 
 export const name = 'dsh-attention-router';
 export const inject = ['tools'];
@@ -17,11 +19,47 @@ try {
   defineTool = (options) => ({ ...options });
 }
 
-export function apply(ctx, config = {}) {
-  const rules = mergeRules(config.rules || {});
-  const policy = { notifyInform: config.policy?.notifyInform === true };
-  const fallbackTier = config.fallbackTier || 'decide';
-  const deduper = new Deduper({ cooldownMs: Number(config.dedupe?.cooldownMs ?? 60_000) });
+export function apply(ctx, rawConfig = {}) {
+  const { config } = validateConfig(rawConfig);
+  const warnings = [];
+  let rulesExtra = { ...config.rules };
+  let rules = mergeRules(rulesExtra);
+  let rulesReloadCount = 0;
+  let rulesFile = config.rulesFile;
+
+  const reloadRulesFile = () => {
+    if (!rulesFile) return;
+    try {
+      const loaded = loadRulesFile(rulesFile);
+      if (loaded.warning) warnings.push(loaded.warning);
+      if (loaded.rules) {
+        const combined = {};
+        for (const tier of ['alert', 'decide', 'inform']) {
+          combined[tier] = [...(config.rules[tier] || []), ...(loaded.rules[tier] || [])];
+        }
+        rules = mergeRules(combined);
+        rulesReloadCount += 1;
+      }
+    } catch (err) {
+      warnings.push(`rules reload failed: ${err.message}`);
+    }
+  };
+  reloadRulesFile();
+
+  if (config.rulesFile && config.rulesFileWatch) {
+    try {
+      watchFile(rulesFile, { interval: 500 }, (cur, prev) => {
+        if (cur.mtimeMs !== prev.mtimeMs) reloadRulesFile();
+      });
+    } catch (err) {
+      warnings.push(`rulesFileWatch failed: ${err.message}`);
+    }
+  }
+
+  const policy = config.policy;
+  const fallbackTier = config.fallbackTier;
+  const deduper = new Deduper(config.dedupe);
+  warnings.push(...deduper.warnings);
 
   const out = {
     schema: { type: 'object', additionalProperties: true },
@@ -36,7 +74,7 @@ export function apply(ctx, config = {}) {
       parameters: {
         text: { type: 'string', required: true, description: 'Event text.' },
         kind: { type: 'string', description: 'Event kind, e.g. event/fault/notice.' },
-        dedupe: { type: 'boolean', description: 'Apply in-memory cooldown dedupe (default true).' },
+        dedupe: { type: 'boolean', description: 'Apply cooldown dedupe (default true).' },
       },
       output: out,
       async execute(args = {}) {
@@ -54,7 +92,7 @@ export function apply(ctx, config = {}) {
   ctx.tools.register(
     defineTool({
       name: 'notify_policy',
-      description: 'Show the current attention policy, rule counts and ruleset hash.',
+      description: 'Show the current attention policy, rule counts, rules source and warnings.',
       parameters: {},
       output: out,
       async execute() {
@@ -63,14 +101,18 @@ export function apply(ctx, config = {}) {
           policy,
           fallbackTier,
           dedupeCooldownMs: deduper.cooldownMs,
-          rulesSource: config.rules ? 'merged(default + config)' : 'default',
+          dedupePersisted: Boolean(config.dedupe.stateFile),
+          rulesSource: rulesFile ? (config.rulesFileWatch ? 'default + config + file (watching)' : 'default + config + file') : (Object.keys(config.rules).length ? 'merged(default + config)' : 'default'),
+          rulesFile,
+          rulesReloadCount,
           rulesCount: counts,
           defaultsFrozen: Object.isFrozen(DEFAULT_RULES),
+          warnings,
           policyHint: 'alert=>deliver_now, decide=>queue_for_review, inform=>log_only (or deliver_digest)',
         };
       },
     })
   );
 
-  return { rules, policy, fallbackTier };
+  return { rules, policy, fallbackTier, warnings };
 }

@@ -27,18 +27,23 @@ dsh plugin --profile web add dsh-attention-router
 - `notify_classify` — classify text, return `{ tier, matched, action, notify }`
 - `notify_policy` — show current policy and rule counts
 
-## Config
+## Config (0.2.0)
 
-```yaml
-- id: dsh-attention-router
-  name: dsh-attention-router
-  config:
-    rules:
-      alert: ["lookup failure"]
-      decide: ["approve this"]
-    policy:
-      notifyInform: false
+```json
+{
+  "rules": { "alert": ["lookup failure"], "decide": ["approve this"] },
+  "rulesFile": "~/.dsh/attention-rules.json",
+  "rulesFileWatch": true,
+  "policy": { "notifyInform": false },
+  "fallbackTier": "decide",
+  "dedupe": { "cooldownMs": 60000, "stateFile": "~/.dsh/attention-dedupe.json", "maxEntries": 1000 }
+}
 ```
+
+- `rulesFile`: external JSON rules (`{alert?: string[], decide?: string[], inform?: string[]}`); missing file falls back to defaults with a warning; `rulesFileWatch: true` hot-reloads on change.
+- `dedupe.stateFile`: persists cooldown state across restarts (atomic write; corrupt state is quarantined with a warning).
+- Unknown keys, unknown tiers and invalid values throw a readable `ConfigError`.
+- Example: `config.example.json`. Run `npm run verify` for tests + pack-content/size/safety checks.
 
 ## License
 
