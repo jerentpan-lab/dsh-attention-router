@@ -13,7 +13,7 @@ export class ConfigError extends Error {
   }
 }
 
-const TOP_KEYS = new Set(['rules', 'rulesFile', 'rulesFileWatch', 'policy', 'fallbackTier', 'dedupe']);
+const TOP_KEYS = new Set(['rules', 'rulesFile', 'rulesFileWatch', 'policy', 'fallbackTier', 'dedupe', 'negations']);
 const DEFAULTS = Object.freeze({
   rules: {},
   rulesFile: null,
@@ -21,6 +21,7 @@ const DEFAULTS = Object.freeze({
   policy: { notifyInform: false },
   fallbackTier: 'decide',
   dedupe: { cooldownMs: 60_000, stateFile: null, maxEntries: 1000 },
+  negations: [],
 });
 
 function isPlainObject(v) {
@@ -58,6 +59,17 @@ export function validateConfig(raw = {}) {
           }
           rules[tier] = cleaned;
         }
+      }
+    }
+  }
+
+  const negations = [];
+  if (raw.negations !== undefined) {
+    if (!Array.isArray(raw.negations)) errors.push('negations: must be an array of non-empty strings');
+    else {
+      for (const [i, item] of raw.negations.entries()) {
+        if (typeof item !== 'string' || item.trim() === '') errors.push(`negations[${i}]: must be a non-empty string`);
+        else negations.push(item.trim());
       }
     }
   }
@@ -119,6 +131,7 @@ export function validateConfig(raw = {}) {
       policy,
       fallbackTier,
       dedupe,
+      negations,
     },
   };
 }

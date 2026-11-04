@@ -45,6 +45,34 @@ dsh plugin --profile web add dsh-attention-router
 - Unknown keys, unknown tiers and invalid values throw a readable `ConfigError`.
 - Example: `config.example.json`. Run `npm run verify` for tests + pack-content/size/safety checks.
 
+## Demo
+
+```bash
+node examples/demo.mjs
+```
+
+## Bench
+
+`node bench/bench.mjs` writes `bench/RESULTS.md` (this host: 1000 classify p50 ≈ 19.8ms, 10000 ≈ 184.9ms).
+
+## Troubleshooting (error table)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `ConfigError ... unknown key` | typo/unsupported config key | use keys from `config.example.json` |
+| `ConfigError ... rules.<tier>` | tier not alert/decide/inform | fix tier name |
+| `ConfigError ... dedupe.cooldownMs` | negative/NaN number | use a finite number >= 0 |
+| `rulesFile not found` warning | external rules path missing | keep defaults or fix path |
+| `rulesFile: invalid JSON` | malformed rule file | validate JSON |
+| `dedupe state unreadable` warning | state file corrupt | it is ignored; delete it to reset |
+| `rule conflict` warning | same literal in multiple tiers | keep the pattern in one tier only |
+
+## Verify
+
+```bash
+npm run verify   # unit tests + npm pack content/size/safety checks
+```
+
 ## License
 
 MIT

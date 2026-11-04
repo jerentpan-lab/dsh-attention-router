@@ -1,6 +1,6 @@
 {
   "name": "dsh-attention-router",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Attention router for DeepSeek Harness: classify events into inform / decide / alert so agents stop over-notifying.",
   "type": "module",
   "main": "src/index.js",
@@ -13,7 +13,8 @@
     "README.md",
     "README.zh.md",
     "LICENSE",
-    "config.example.json"
+    "config.example.json",
+    "examples"
   ],
   "keywords": [
     "dsh",

@@ -3,7 +3,7 @@
  * Audit-hardened 2026-11-02 (three-party review).
  */
 import { watchFile, unwatchFile } from 'node:fs';
-import { DEFAULT_RULES, Deduper, classify, mergeRules, route } from './core.js';
+import { DEFAULT_RULES, Deduper, classify, detectRuleConflicts, mergeRules, route } from './core.js';
 import { ConfigError, loadRulesFile, validateConfig } from './config.js';
 
 export const name = 'dsh-attention-router';
@@ -24,6 +24,7 @@ export function apply(ctx, rawConfig = {}) {
   const warnings = [];
   let rulesExtra = { ...config.rules };
   let rules = mergeRules(rulesExtra);
+  let ruleConflicts = detectRuleConflicts(rulesExtra);
   let rulesReloadCount = 0;
   let rulesFile = config.rulesFile;
 
@@ -38,6 +39,7 @@ export function apply(ctx, rawConfig = {}) {
           combined[tier] = [...(config.rules[tier] || []), ...(loaded.rules[tier] || [])];
         }
         rules = mergeRules(combined);
+        ruleConflicts = detectRuleConflicts(combined);
         rulesReloadCount += 1;
       }
     } catch (err) {
@@ -56,6 +58,7 @@ export function apply(ctx, rawConfig = {}) {
     }
   }
 
+  for (const c of ruleConflicts) warnings.push(`rule conflict: "${c.pattern}" in ${c.tiers.join(' & ')} — ${c.suggestion}`);
   const policy = config.policy;
   const fallbackTier = config.fallbackTier;
   const deduper = new Deduper(config.dedupe);
@@ -78,7 +81,7 @@ export function apply(ctx, rawConfig = {}) {
       },
       output: out,
       async execute(args = {}) {
-        const result = classify(args.text, { kind: args.kind, rules, fallbackTier });
+        const result = classify(args.text, { kind: args.kind, rules, fallbackTier, negations: config.negations });
         const routed = route(result.tier, policy);
         let dedupe = { suppressed: false, count: 0 };
         if (args.dedupe !== false && routed.action === 'deliver_now') {
@@ -105,6 +108,8 @@ export function apply(ctx, rawConfig = {}) {
           rulesSource: rulesFile ? (config.rulesFileWatch ? 'default + config + file (watching)' : 'default + config + file') : (Object.keys(config.rules).length ? 'merged(default + config)' : 'default'),
           rulesFile,
           rulesReloadCount,
+          negations: config.negations,
+          ruleConflicts,
           rulesCount: counts,
           defaultsFrozen: Object.isFrozen(DEFAULT_RULES),
           warnings,

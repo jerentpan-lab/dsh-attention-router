@@ -19,7 +19,7 @@ export const DEFAULT_RULES = Object.freeze({
   alert: Object.freeze([
     '断链', '不可达', '失败', '异常', '告警', '错误', '超时', '丢失', 'OOM',
     '回滚触发', '恢复失败', '数据不一致', '未通过', '不通过', '驳回', '打回',
-    'error', 'fail', 'timeout', 'panic', 'down',
+    'error', 'fail', 'timeout', 'panic', 'down', 'anomaly', 'аномалия', 'ошибка', 'ошибки', 'ошибок', 'сбой', 'отказ', 'таймаут', 'недоступен',
   ]),
   decide: Object.freeze([
     '授权', '批准', '同意', '拍板', '裁决', '请叔', '需叔', '要不要',
@@ -30,7 +30,7 @@ export const DEFAULT_RULES = Object.freeze({
   inform: Object.freeze([
     '完成', '已发布', '记录', '正常', '成功', '指标', '已修复', '通了',
     '通过验收', '测试通过', '更新', '盘点', '周报', '纪要',
-    'success', 'done', 'published',
+    'success', 'done', 'published', 'готово', 'успешно', 'опубликовано',
   ]),
 });
 
@@ -39,7 +39,8 @@ export const ALERT_KINDS = Object.freeze([
   'alert', 'fault', 'failure', 'error', 'critical', 'fatal', 'panic', 'emergency', 'degraded',
 ]);
 
-const NEGATIONS = ['没有', '无', '未', '不', '零', '0', 'none', 'no', 'not', 'without'];
+export const DEFAULT_NEGATIONS = ['没有', '无', '未', '不', '零', '0', 'none', 'no', 'not', 'without', 'нет', 'не', 'без', 'никаких'];
+const NEGATIONS = DEFAULT_NEGATIONS;
 
 function escapeLiteral(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -82,9 +83,9 @@ export function textOf(input) {
   throw new TypeError('classify: text must be a string or an object with a text/msg/message field');
 }
 
-function negatedAt(raw, index) {
+function negatedAt(raw, index, extraNegations = []) {
   const head = raw.slice(0, index).toLowerCase().trimEnd();
-  for (const neg of NEGATIONS) {
+  for (const neg of [...NEGATIONS, ...extraNegations]) {
     if (!neg) continue;
     if (head.endsWith(neg)) return true;
     // English negation followed by a space: "... no error", "not down"
@@ -93,12 +94,12 @@ function negatedAt(raw, index) {
   return false;
 }
 
-function findMatch(raw, entries) {
+function findMatch(raw, entries, extraNegations = []) {
   const negated = [];
   for (const { rule, re } of entries) {
     const m = re.exec(raw);
     if (!m) continue;
-    if (negatedAt(raw, m.index)) {
+    if (negatedAt(raw, m.index, extraNegations)) {
       negated.push({ matched: m[0], rule });
       continue; // "无异常" is not an alert
     }
@@ -110,7 +111,7 @@ function findMatch(raw, entries) {
 /**
  * Classify a text event.
  * @param {string|object} input
- * @param {{kind?: string, rules?: object, fallbackTier?: 'alert'|'decide'|'inform'}} [options]
+ * @param {{kind?: string, rules?: object, fallbackTier?: 'alert'|'decide'|'inform', negations?: string[]}} [options]
  * @returns {{tier, matched, rule, kind, unmatched, negated}}
  */
 export function classify(input, options = {}) {
@@ -125,10 +126,11 @@ export function classify(input, options = {}) {
     return { tier: 'alert', matched: `unknown-kind:${kind}`, rule: `unknown-kind:${kind}`, kind, unmatched: false, negated: false };
   }
 
+  const extraNegations = Array.isArray(options.negations) ? options.negations.map(String).filter(Boolean) : [];
   const compiled = compileRules(options.rules || DEFAULT_RULES);
   let negatedHit = null;
   for (const tier of ['alert', 'decide', 'inform']) {
-    const { positive, negated } = findMatch(raw, compiled[tier]);
+    const { positive, negated } = findMatch(raw, compiled[tier], options.negations || []);
     if (positive) return { tier, matched: positive.matched, rule: positive.rule, kind, unmatched: false, negated: false };
     if (!negatedHit && negated.length) negatedHit = negated[0];
   }
@@ -215,6 +217,22 @@ export class Deduper {
     this.save();
     return { suppressed: false, count: 0 };
   }
+}
+
+/** Detect the same literal placed in multiple tiers (case-insensitive, trimmed). */
+export function detectRuleConflicts(configRules = {}) {
+  const seen = new Map();
+  for (const tier of TIERS) {
+    const list = Array.isArray(configRules?.[tier]) ? configRules[tier] : [];
+    for (const raw of list) {
+      const key = String(raw).trim().toLowerCase();
+      if (!key) continue;
+      if (!seen.has(key)) seen.set(key, { pattern: String(raw).trim(), tiers: [] });
+      const entry = seen.get(key);
+      if (!entry.tiers.includes(tier)) entry.tiers.push(tier);
+    }
+  }
+  return [...seen.values()].filter((e) => e.tiers.length > 1).map((e) => ({ ...e, suggestion: `keep "${e.pattern}" in one tier only` }));
 }
 
 /** Merge configured rules on top of defaults (append + dedupe). */
